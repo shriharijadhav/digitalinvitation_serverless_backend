@@ -34,6 +34,8 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
+    
+
   await runMiddleware(req, res, uploadMiddleware);
   console.log(req.file.buffer);
   const stream = await cloudinary.uploader.upload_stream(

@@ -98,6 +98,10 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  return res.status(400).json({
+    message: 'Bride or Groom image is not found',
+  });
+  
   await runMiddleware(req, res, uploadMiddleware);
 
   try {
