@@ -16,10 +16,14 @@ export default async function handler(req, res) {
     await dbConnect();
 
      // Set CORS headers
-     res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins
-     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); // Allow specific methods
-     res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Allow specific headers
- 
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS'); // Allow all methods
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Allow specific headers
+
+     // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
      try {
         const {cardUrl} = req.body;
