@@ -14,32 +14,47 @@ import PhotoGalleryModel from '../models/photoGallery.model';
 import AudioFileModel from '../models/audioFile.model';
 import FamilyModel from '../models/family.model';
 
-
-const CLOUDINARY_CLOUDNAME =  process.env.CLOUDINARY_CLOUDNAME
-const CLOUDINARY_API_KEY =  process.env.CLOUDINARY_API_KEY
-const CLOUDINARY_API_SECRET =   process.env.CLOUDINARY_API_SECRET
-
-const brideImagesFolderName = process.env.brideImagesFolderName
-const groomImagesFolderName = process.env.groomImagesFolderName
-const photoGalleryFolderName = process.env.photoGalleryFolderName
-const allAudioFilesFolderName = process.env.allAudioFilesFolderName
-const allFamilyMembersFolder = process.env.allFamilyMembersFolder
-
-
-
-
 dotenv.config();
 
+const CLOUDINARY_CLOUDNAME = process.env.CLOUDINARY_CLOUDNAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
+
+const brideImagesFolderName = process.env.brideImagesFolderName;
+const groomImagesFolderName = process.env.groomImagesFolderName;
+const photoGalleryFolderName = process.env.photoGalleryFolderName;
+const allAudioFilesFolderName = process.env.allAudioFilesFolderName;
+const allFamilyMembersFolder = process.env.allFamilyMembersFolder;
+
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
-const uploadMiddleware = upload.array('files');
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'audio/mpeg', 'audio/mp3'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type'), false);
+    }
+  },
+}).fields([
+  { name: 'brideActualImage', maxCount: 1 },
+  { name: 'groomActualImage', maxCount: 1 },
+  { name: 'userAudioFile', maxCount: 1 },
+  { name: 'photoGallery_', maxCount: 10 },
+  { name: 'family_', maxCount: 10 },
+]);
+
+const uploadMiddleware = upload;
 
 cloudinary.config({
-    cloud_name: CLOUDINARY_CLOUDNAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
-    secure: true,
-  });
+  cloud_name: CLOUDINARY_CLOUDNAME,
+  api_key: CLOUDINARY_API_KEY,
+  api_secret: CLOUDINARY_API_SECRET,
+  secure: true,
+});
 
 const runMiddleware = (req, res, fn) => {
   return new Promise((resolve, reject) => {
@@ -74,9 +89,9 @@ const uploadMultipleFiles = async (files, folderName) => {
 
 export default async function handler(req, res) {
   // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Allow all origins
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS'); // Allow all methods
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Allow specific headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -190,9 +205,7 @@ export default async function handler(req, res) {
 
     if (addEngagementDetails) {
       const { engagementDate, raw_engagementDate, engagementTime, engagementAddress } = engagementData;
-      let temp_engagementAddress = isEngagementAddressSameAsWedding
-        ? 'Same as Wedding address'
-        : engagementAddress;
+      let temp_engagementAddress = isEngagementAddressSameAsWedding ? 'Same as Wedding address' : engagementAddress;
 
       const savedEngagement = await EngagementModel.create({
         engagementDate: engagementDate,
@@ -209,9 +222,7 @@ export default async function handler(req, res) {
 
     if (addSangeetDetails) {
       const { sangeetDate, raw_sangeetDate, sangeetTime, sangeetAddress } = sangeetData;
-      let temp_sangeetAddress = isSangeetAddressSameAsWedding
-        ? 'Same as Wedding address'
-        : sangeetAddress;
+      let temp_sangeetAddress = isSangeetAddressSameAsWedding ? 'Same as Wedding address' : sangeetAddress;
 
       const savedSangeet = await SangeetModel.create({
         sangeetDate: sangeetDate,
@@ -228,9 +239,7 @@ export default async function handler(req, res) {
 
     if (addHaldiDetails) {
       const { haldiDate, raw_haldiDate, haldiTime, haldiAddress } = haldiData;
-      let temp_haldiAddress = isSangeetAddressSameAsWedding
-        ? 'Same as Wedding address'
-        : haldiAddress;
+      let temp_haldiAddress = isHaldiAddressSameAsWedding ? 'Same as Wedding address' : haldiAddress;
 
       const savedHaldi = await HaldiModel.create({
         haldiDate: haldiDate,
@@ -245,64 +254,69 @@ export default async function handler(req, res) {
       isHaldiDetailsSaved = !!savedHaldi;
     }
 
-    const { firstName: b_firstName, lastName: b_lastName, socialMediaLinks: b_socialMedia } = brideData;
-    const b_instagramUrl = b_socialMedia[0].instagramLink;
-    const b_facebookUrl = b_socialMedia[1].facebookLink;
-    const b_youtubeUrl = b_socialMedia[2].youtubeLink;
+    if (brideData) {
+      const { brideFirstName, brideFatherName, brideMotherName, brideAddress, brideMobileNumber, brideEmail } = brideData;
 
-    const savedBride = await BrideModel.create({
-      firstName: b_firstName,
-      lastName: b_lastName,
-      instagramLink: b_instagramUrl,
-      facebookLink: b_facebookUrl,
-      youtubeLink: b_youtubeUrl,
-      brideImageLink: brideImage_secureUrl,
-      card: savedCard._id,
-      event: savedEvent._id,
-      user: user_Id,
-    });
+      const savedBrideDetails = await BrideModel.create({
+        brideFirstName: brideFirstName,
+        brideFatherName: brideFatherName,
+        brideMotherName: brideMotherName,
+        brideAddress: brideAddress,
+        brideMobileNumber: brideMobileNumber,
+        brideEmail: brideEmail,
+        brideActualImage: brideImage_secureUrl,
+        card: savedCard._id,
+        event: savedEvent._id,
+        user: user_Id,
+      });
 
-    isBrideDetailsSaved = !!savedBride;
+      isBrideDetailsSaved = !!savedBrideDetails;
+    }
 
-    const { firstName: g_firstName, lastName: g_lastName, socialMediaLinks: g_socialMedia } = groomData;
-    const g_instagramUrl = g_socialMedia[0].instagramLink;
-    const g_facebookUrl = g_socialMedia[1].facebookLink;
-    const g_youtubeUrl = g_socialMedia[2].youtubeLink;
+    if (groomData) {
+      const { groomFirstName, groomFatherName, groomMotherName, groomAddress, groomMobileNumber, groomEmail } = groomData;
 
-    const savedGroom = await GroomModel.create({
-      firstName: g_firstName,
-      lastName: g_lastName,
-      instagramLink: g_instagramUrl,
-      facebookLink: g_facebookUrl,
-      youtubeLink: g_youtubeUrl,
-      groomImageLink: groomImage_secureUrl,
-      card: savedCard._id,
-      event: savedEvent._id,
-      user: user_Id,
-    });
+      const savedGroomDetails = await GroomModel.create({
+        groomFirstName: groomFirstName,
+        groomFatherName: groomFatherName,
+        groomMotherName: groomMotherName,
+        groomAddress: groomAddress,
+        groomMobileNumber: groomMobileNumber,
+        groomEmail: groomEmail,
+        groomActualImage: groomImage_secureUrl,
+        card: savedCard._id,
+        event: savedEvent._id,
+        user: user_Id,
+      });
 
-    isGroomDetailsSaved = !!savedGroom;
+      isGroomDetailsSaved = !!savedGroomDetails;
+    }
 
-    const imageUploadPromises = imageArray.map((file) =>
-      uploadMediaToCloudinary(file.buffer, photoGalleryFolderName)
-    );
-    const imageUploadResults = await Promise.all(imageUploadPromises);
+    if (imageArray.length > 0) {
+      const imageUploadPromises = uploadMultipleFiles(imageArray, photoGalleryFolderName);
+      const imageUploadResults = await Promise.all(imageUploadPromises);
 
-    const galleryData = imageUploadResults.map((url, index) => ({
-      [`image_${index + 1}`]: url,
-      card: savedCard._id,
-      event: savedEvent._id,
-      user: user_Id,
-    }));
+      const photoGalleryDocuments = imageUploadResults.map((imageUrl) => ({
+        imageUrl,
+        card: savedCard._id,
+        event: savedEvent._id,
+        user: user_Id,
+      }));
 
-    const savedPhotoGallery = await PhotoGalleryModel.insertMany(galleryData);
+      const savedPhotoGallery = await PhotoGalleryModel.insertMany(photoGalleryDocuments);
 
-    isPhotoGallerySaved = savedPhotoGallery.length === imageArray.length;
+      isPhotoGallerySaved = savedPhotoGallery.length > 0;
+    }
 
     if (userAudioFilePath) {
-      const audioFileUrl = await uploadMediaToCloudinary(userAudioFilePath, allAudioFilesFolderName, 'video');
+      const userAudio_secureUrl = await uploadMediaToCloudinary(
+        userAudioFilePath,
+        allAudioFilesFolderName,
+        'audio'
+      );
+
       const savedAudioFile = await AudioFileModel.create({
-        audioFileLink: audioFileUrl,
+        audioFileUrl: userAudio_secureUrl,
         card: savedCard._id,
         event: savedEvent._id,
         user: user_Id,
@@ -311,53 +325,48 @@ export default async function handler(req, res) {
       isAudioFileSaved = !!savedAudioFile;
     }
 
-    const { familyDetails } = allData;
-    if (familyDetails.length > 0) {
-      const familyUploadPromises = familyDetails.map(async (family, index) => {
-        const { familyMemberRelation, familyMemberName } = family;
-        const familyImage = req.files.find((f) => f.fieldname === `familyMemberImage_${index}`);
+    if (eventData.familyDetails && eventData.familyDetails.length > 0) {
+      const familyUploadPromises = eventData.familyDetails.map(async (familyMember, index) => {
+        const familyMemberImage = req.files.find((f) => f.fieldname === `family_${index}`);
+        let image_secureUrl = '';
 
-        let familyImageLink = '';
-        if (familyImage) {
-          familyImageLink = await uploadMediaToCloudinary(familyImage.buffer, allFamilyMembersFolder);
+        if (familyMemberImage) {
+          image_secureUrl = await uploadMediaToCloudinary(
+            familyMemberImage.buffer,
+            allFamilyMembersFolder
+          );
         }
 
         return FamilyModel.create({
-          familyMemberRelation: familyMemberRelation,
-          familyMemberName: familyMemberName,
-          familyMemberImageLink: familyImageLink,
+          ...familyMember,
+          familyMemberImage: image_secureUrl,
           card: savedCard._id,
           event: savedEvent._id,
           user: user_Id,
         });
       });
 
-      const savedFamilyMembers = await Promise.all(familyUploadPromises);
-      isFamilyDetailsSaved = savedFamilyMembers.length === familyDetails.length;
+      const savedFamilyDetails = await Promise.all(familyUploadPromises);
+
+      isFamilyDetailsSaved = savedFamilyDetails.length > 0;
     }
 
-    res.status(200).json({
-      message: 'New Card Created successfully',
-      engagementDetailsSaved: isEngagementDetailsSaved,
-      sangeetDetailsSaved: isSangeetDetailsSaved,
-      haldiDetailsSaved: isHaldiDetailsSaved,
-      brideDetailsSaved: isBrideDetailsSaved,
-      groomDetailsSaved: isGroomDetailsSaved,
-      photoGallerySaved: isPhotoGallerySaved,
-      audioFileSaved: isAudioFileSaved,
-      familyDetailsSaved: isFamilyDetailsSaved,
+    return res.status(200).json({
+      message: 'Data saved successfully',
+      eventId: savedEvent._id,
+      cardId: savedCard._id,
+      userId: user_Id,
+      isEngagementDetailsSaved,
+      isSangeetDetailsSaved,
+      isHaldiDetailsSaved,
+      isBrideDetailsSaved,
+      isGroomDetailsSaved,
+      isPhotoGallerySaved,
+      isAudioFileSaved,
+      isFamilyDetailsSaved,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message,
-    });
+    console.error('Error saving data:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
