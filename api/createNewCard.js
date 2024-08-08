@@ -16,15 +16,16 @@ import FamilyModel from '../models/family.model';
 
 dotenv.config();
 
-const CLOUDINARY_CLOUDNAME = process.env.CLOUDINARY_CLOUDNAME;
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
-
-const brideImagesFolderName = process.env.brideImagesFolderName;
-const groomImagesFolderName = process.env.groomImagesFolderName;
-const photoGalleryFolderName = process.env.photoGalleryFolderName;
-const allAudioFilesFolderName = process.env.allAudioFilesFolderName;
-const allFamilyMembersFolder = process.env.allFamilyMembersFolder;
+const {
+  CLOUDINARY_CLOUDNAME,
+  CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET,
+  brideImagesFolderName,
+  groomImagesFolderName,
+  photoGalleryFolderName,
+  allAudioFilesFolderName,
+  allFamilyMembersFolder,
+} = process.env;
 
 const storage = multer.memoryStorage();
 
@@ -98,8 +99,6 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  
-
   await runMiddleware(req, res, uploadMiddleware);
 
   try {
@@ -112,16 +111,14 @@ export default async function handler(req, res) {
     const groomData = allData.groomDetails;
 
     let userAudioFilePath = '';
-    const userAudioFile = req.files.find((f) => f.fieldname === 'userAudioFile');
-    if (userAudioFile) {
-      userAudioFilePath = userAudioFile.buffer;
+    if (req.files['userAudioFile']) {
+      userAudioFilePath = req.files['userAudioFile'][0].buffer;
     }
 
-    const brideActualImage = req.files.find((f) => f.fieldname === 'brideActualImage');
-    const groomActualImage = req.files.find((f) => f.fieldname === 'groomActualImage');
-    const imageArray = req.files.filter((element) =>
-      element.fieldname.includes('photoGallery_')
-    ) || [];
+    const brideActualImage = req.files['brideActualImage'] ? req.files['brideActualImage'][0] : null;
+    const groomActualImage = req.files['groomActualImage'] ? req.files['groomActualImage'][0] : null;
+    const imageArray = req.files['photoGallery_'] || [];
+    const familyImages = req.files['family_'] || [];
 
     if (!brideActualImage || !groomActualImage) {
       return res.status(400).json({
@@ -256,119 +253,135 @@ export default async function handler(req, res) {
       isHaldiDetailsSaved = !!savedHaldi;
     }
 
-    if (brideData) {
-      const { brideFirstName, brideFatherName, brideMotherName, brideAddress, brideMobileNumber, brideEmail } = brideData;
+    if (brideActualImage && brideData) {
+      const {
+        brideName,
+        brideFatherName,
+        brideMotherName,
+        brideNativePlace,
+        brideHigherEducation,
+        brideWorkingPlace,
+        brideWorkingAs,
+        brideFacebookLink,
+        brideInstagramLink,
+      } = brideData;
 
-      const savedBrideDetails = await BrideModel.create({
-        brideFirstName: brideFirstName,
+      const savedBride = await BrideModel.create({
+        brideImageUrl: brideImage_secureUrl,
+        brideName: brideName,
         brideFatherName: brideFatherName,
         brideMotherName: brideMotherName,
-        brideAddress: brideAddress,
-        brideMobileNumber: brideMobileNumber,
-        brideEmail: brideEmail,
-        brideActualImage: brideImage_secureUrl,
+        brideNativePlace: brideNativePlace,
+        brideHigherEducation: brideHigherEducation,
+        brideWorkingPlace: brideWorkingPlace,
+        brideWorkingAs: brideWorkingAs,
+        brideFacebookLink: brideFacebookLink,
+        brideInstagramLink: brideInstagramLink,
         card: savedCard._id,
         event: savedEvent._id,
         user: user_Id,
       });
 
-      isBrideDetailsSaved = !!savedBrideDetails;
+      isBrideDetailsSaved = !!savedBride;
     }
 
-    if (groomData) {
-      const { groomFirstName, groomFatherName, groomMotherName, groomAddress, groomMobileNumber, groomEmail } = groomData;
+    if (groomActualImage && groomData) {
+      const {
+        groomName,
+        groomFatherName,
+        groomMotherName,
+        groomNativePlace,
+        groomHigherEducation,
+        groomWorkingPlace,
+        groomWorkingAs,
+        groomFacebookLink,
+        groomInstagramLink,
+      } = groomData;
 
-      const savedGroomDetails = await GroomModel.create({
-        groomFirstName: groomFirstName,
+      const savedGroom = await GroomModel.create({
+        groomImageUrl: groomImage_secureUrl,
+        groomName: groomName,
         groomFatherName: groomFatherName,
         groomMotherName: groomMotherName,
-        groomAddress: groomAddress,
-        groomMobileNumber: groomMobileNumber,
-        groomEmail: groomEmail,
-        groomActualImage: groomImage_secureUrl,
+        groomNativePlace: groomNativePlace,
+        groomHigherEducation: groomHigherEducation,
+        groomWorkingPlace: groomWorkingPlace,
+        groomWorkingAs: groomWorkingAs,
+        groomFacebookLink: groomFacebookLink,
+        groomInstagramLink: groomInstagramLink,
         card: savedCard._id,
         event: savedEvent._id,
         user: user_Id,
       });
 
-      isGroomDetailsSaved = !!savedGroomDetails;
+      isGroomDetailsSaved = !!savedGroom;
     }
 
     if (imageArray.length > 0) {
-      const imageUploadPromises = uploadMultipleFiles(imageArray, photoGalleryFolderName);
-      const imageUploadResults = await Promise.all(imageUploadPromises);
-
-      const photoGalleryDocuments = imageUploadResults.map((imageUrl) => ({
-        imageUrl,
+      const uploadedImages = await uploadMultipleFiles(imageArray, photoGalleryFolderName);
+      const imageObjects = uploadedImages.map((url) => ({
+        imageUrl: url,
         card: savedCard._id,
         event: savedEvent._id,
         user: user_Id,
       }));
 
-      const savedPhotoGallery = await PhotoGalleryModel.insertMany(photoGalleryDocuments);
-
-      isPhotoGallerySaved = savedPhotoGallery.length > 0;
+      const savedPhotoGallery = await PhotoGalleryModel.insertMany(imageObjects);
+      isPhotoGallerySaved = savedPhotoGallery.length === imageArray.length;
     }
 
     if (userAudioFilePath) {
       const userAudio_secureUrl = await uploadMediaToCloudinary(
         userAudioFilePath,
         allAudioFilesFolderName,
-        'audio'
+        'video'
       );
 
-      const savedAudioFile = await AudioFileModel.create({
-        audioFileUrl: userAudio_secureUrl,
+      const savedAudio = await AudioFileModel.create({
+        audioUrl: userAudio_secureUrl,
         card: savedCard._id,
         event: savedEvent._id,
         user: user_Id,
       });
 
-      isAudioFileSaved = !!savedAudioFile;
+      isAudioFileSaved = !!savedAudio;
     }
 
-    if (eventData.familyDetails && eventData.familyDetails.length > 0) {
-      const familyUploadPromises = eventData.familyDetails.map(async (familyMember, index) => {
-        const familyMemberImage = req.files.find((f) => f.fieldname === `family_${index}`);
-        let image_secureUrl = '';
+    if (familyImages.length > 0 && addFamilyDetails) {
+      const uploadedFamilyImages = await uploadMultipleFiles(familyImages, allFamilyMembersFolder);
+      const familyMembersArray = allData.familyDetails;
+      const familyImageObjects = uploadedFamilyImages.map((url, index) => ({
+        familyMemberName: familyMembersArray[index].familyMemberName,
+        familyMemberRelation: familyMembersArray[index].familyMemberRelation,
+        familyMemberImageUrl: url,
+        card: savedCard._id,
+        event: savedEvent._id,
+        user: user_Id,
+      }));
 
-        if (familyMemberImage) {
-          image_secureUrl = await uploadMediaToCloudinary(
-            familyMemberImage.buffer,
-            allFamilyMembersFolder
-          );
-        }
-
-        return FamilyModel.create({
-          ...familyMember,
-          familyMemberImage: image_secureUrl,
-          card: savedCard._id,
-          event: savedEvent._id,
-          user: user_Id,
-        });
-      });
-
-      const savedFamilyDetails = await Promise.all(familyUploadPromises);
-
-      isFamilyDetailsSaved = savedFamilyDetails.length > 0;
+      const savedFamilyImages = await FamilyModel.insertMany(familyImageObjects);
+      isFamilyDetailsSaved = savedFamilyImages.length === familyImages.length;
     }
 
     return res.status(200).json({
+      success: true,
+      savedCard,
+      savedEvent,
       message: 'Data saved successfully',
-      eventId: savedEvent._id,
-      cardId: savedCard._id,
-      userId: user_Id,
-      isEngagementDetailsSaved,
-      isSangeetDetailsSaved,
-      isHaldiDetailsSaved,
       isBrideDetailsSaved,
       isGroomDetailsSaved,
       isPhotoGallerySaved,
       isAudioFileSaved,
       isFamilyDetailsSaved,
+      isEngagementDetailsSaved,
+      isSangeetDetailsSaved,
+      isHaldiDetailsSaved,
     });
   } catch (error) {
-    console.error('Error saving data:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error('Error in handler:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'An error occurred while processing your request',
+    });
   }
 }
